@@ -33,7 +33,7 @@ export const RevenueSummary: React.FC<RevenueSummaryProps> = ({ propertyId = 'pr
                 });
                 setData(response);
             } catch (err) {
-                setError('Failed to load revenue data');
+                setError(err instanceof Error ? err.message : 'Failed to load revenue data');
                 console.error(err);
             } finally {
                 setLoading(false);

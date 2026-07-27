@@ -2,6 +2,27 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Dict, Any, List
 
+from app.config import settings
+
+
+class RevenueUnavailableError(Exception):
+    """Raised when revenue can't be computed from the database and
+    MOCK_TESTING is not enabled to paper over that with fixture data."""
+
+
+# Fixture data for local testing when there's no database at all
+# (MOCK_TESTING=true). Keyed by property_id only - this is a flat,
+# tenant-unaware dev/demo dataset, not a per-tenant fallback: real
+# requests never reach this path (see MOCK_TESTING in config.py).
+MOCK_REVENUE_DATA = {
+    'prop-001': {'total': '1000.00', 'count': 3},
+    'prop-002': {'total': '4975.50', 'count': 4},
+    'prop-003': {'total': '6100.50', 'count': 2},
+    'prop-004': {'total': '1776.50', 'count': 4},
+    'prop-005': {'total': '3256.00', 'count': 3},
+}
+
+
 async def calculate_monthly_revenue(property_id: str, month: int, year: int, db_session=None) -> Decimal:
     """
     Calculates revenue for a specific month.
@@ -87,19 +108,17 @@ async def calculate_total_revenue(property_id: str, tenant_id: str) -> Dict[str,
             
     except Exception as e:
         print(f"Database error for {property_id} (tenant: {tenant_id}): {e}")
-        
-        # Create property-specific mock data for testing when DB is unavailable
-        # This ensures each property shows different figures
-        mock_data = {
-            'prop-001': {'total': '1000.00', 'count': 3},
-            'prop-002': {'total': '4975.50', 'count': 4}, 
-            'prop-003': {'total': '6100.50', 'count': 2},
-            'prop-004': {'total': '1776.50', 'count': 4},
-            'prop-005': {'total': '3256.00', 'count': 3}
-        }
-        
-        mock_property_data = mock_data.get(property_id, {'total': '0.00', 'count': 0})
-        
+
+        if not settings.mock_testing:
+            # Fail loudly instead of silently serving fabricated revenue -
+            # a silent fallback here is exactly what caused the original
+            # accuracy and cross-tenant leakage bugs.
+            raise RevenueUnavailableError(
+                f"Unable to retrieve revenue for property '{property_id}'"
+            ) from e
+
+        mock_property_data = MOCK_REVENUE_DATA.get(property_id, {'total': '0.00', 'count': 0})
+
         return {
             "property_id": property_id,
             "tenant_id": tenant_id, 

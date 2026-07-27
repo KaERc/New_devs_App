@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     secret_key: str = "debug_challenge_secret"
     
+    # When true, calculate_total_revenue() falls back to MOCK_REVENUE_DATA
+    # if the database is unreachable. Must default to False: a silent
+    # fallback to fabricated numbers is what caused the original revenue
+    # accuracy bugs, so outside of local testing this must fail loudly.
+    mock_testing: bool = False
+
     # Optional legacy settings
     supabase_url: Optional[str] = None
     supabase_service_role_key: Optional[str] = None
