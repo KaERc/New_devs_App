@@ -1,16 +1,36 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { RevenueSummary } from "./RevenueSummary";
+import { SecureAPI } from "../lib/secureApi";
 
-const PROPERTIES = [
-  { id: 'prop-001', name: 'Beach House Alpha' },
-  { id: 'prop-002', name: 'City Apartment Downtown' },
-  { id: 'prop-003', name: 'Country Villa Estate' },
-  { id: 'prop-004', name: 'Lakeside Cottage' },
-  { id: 'prop-005', name: 'Urban Loft Modern' }
-];
+interface Property {
+  id: string;
+  name: string;
+}
 
 const Dashboard: React.FC = () => {
-  const [selectedProperty, setSelectedProperty] = useState('prop-001');
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState('');
+  const [loadingProperties, setLoadingProperties] = useState(true);
+
+  useEffect(() => {
+    const fetchProperties = async () => {
+      setLoadingProperties(true);
+      try {
+        // Backend scopes this list to the authenticated user's tenant.
+        const response = await SecureAPI.getAllProperties();
+        const items: Property[] = response?.data || [];
+        setProperties(items);
+        setSelectedProperty(items[0]?.id || '');
+      } catch (err) {
+        console.error('Failed to load properties', err);
+        setProperties([]);
+      } finally {
+        setLoadingProperties(false);
+      }
+    };
+
+    fetchProperties();
+  }, []);
 
   return (
     <div className="p-4 lg:p-6 min-h-full">
@@ -33,9 +53,10 @@ const Dashboard: React.FC = () => {
                 <select
                   value={selectedProperty}
                   onChange={(e) => setSelectedProperty(e.target.value)}
+                  disabled={loadingProperties || properties.length === 0}
                   className="block w-full sm:w-auto min-w-[200px] px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                 >
-                  {PROPERTIES.map((property) => (
+                  {properties.map((property) => (
                     <option key={property.id} value={property.id}>
                       {property.name}
                     </option>
@@ -46,7 +67,13 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="space-y-6">
-            <RevenueSummary propertyId={selectedProperty} />
+            {loadingProperties ? (
+              <div className="text-sm text-gray-500">Loading properties...</div>
+            ) : selectedProperty ? (
+              <RevenueSummary propertyId={selectedProperty} />
+            ) : (
+              <div className="text-sm text-gray-500">No properties found for your account.</div>
+            )}
           </div>
         </div>
       </div>
